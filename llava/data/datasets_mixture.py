@@ -223,6 +223,15 @@ def register_datasets_mixtures():
     )
     add_dataset(sharegpt_video)
 
+    carwarning = Dataset(
+        dataset_name="carwarning",
+        dataset_type="carwarning",
+        data_path="./carwarning/data.pkl",
+        image_path="./carwarning/images/",
+        description="",
+    )
+    add_dataset(carwarning)
+
 
 
 
