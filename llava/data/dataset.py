@@ -1787,6 +1787,74 @@ class LazyCoyoWebDataset(Dataset):
         return dict(input_ids=input_ids, labels=targets, image=image_list)
 
 
+class CarWarningDataset(Dataset):
+
+    def __init__(
+        self,
+        data_path: str,
+        image_folder: str,
+        tokenizer: transformers.PreTrainedTokenizer,
+        data_args: DataArguments,
+        training_args: TrainingArguments,
+    ):
+        super().__init__()
+        t1 = time.time()
+
+        with open(data_path, 'rb') as data_reader:
+            self.data_list = pickle.load(data_reader)
+
+        t2 = time.time()
+        print("Loading done. Total time: {:.2f} seconds".format(t2 - t1))
+
+        self.tokenizer = tokenizer
+        self.data_args = data_args
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
+        info = self.data_list[i]
+        question, answer, image_path = info["question"], info['answer'], info["image"]
+        info = self.data_list[i]
+
+        question = question.replace("<image>", "<IMAGE>")
+        answer = answer.replace("<image>", "<IMAGE>")
+        image = Image.open(image_path).convert("RGB")
+
+        rand_prompt = "<image>\n"
+        sources = [
+            {
+                "image": image,
+                "conversations": [
+                    {"from": "human", "value": rand_prompt + question},
+                    {"from": "gpt", "value": answer},
+                ],
+            }
+        ]
+
+        # one example of sources
+        # [{'id': 'GCC_train_001738742', 'image': 'GCC_train_001738742.jpg', 'conversations': [{'from': 'human', 'value': 'Provide a brief description of the given image.\n<image>'}, {'from': 'gpt', 'value': 'a sketch of an ostrich'}]}]
+        if "image" in sources[0]:
+            image = process_image(sources[0]["image"], self.data_args, image_folder=None)
+            image = torch.unsqueeze(image, dim=0)
+            # now random pick some context samples for training
+        else:
+            raise NotImplementedError
+
+        data_dict = preprocess([sources[0]["conversations"]], self.tokenizer, has_image=True)
+
+        if isinstance(i, int):
+            data_dict = dict(input_ids=data_dict["input_ids"][0], labels=data_dict["labels"][0])
+
+        # image exist in the data
+        if image is not None:
+            data_dict["image"] = image
+        else:
+            raise NotImplementedError
+
+        return data_dict
+
+
 class LazyVideoWebDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
@@ -2047,6 +2115,8 @@ def build_datasets(
             dataset_cls = DummyDataset
             if hasattr(dataset, "image_path"):
                 image_folder = dataset.image_path
+        elif dataset_type == 'carwarning':
+            dataset_cls = CarWarningDataset
         else:
             raise NotImplementedError(f"{dataset_type} is not supported.")
         data_args.meta_path = getattr(dataset, "meta_path", None)

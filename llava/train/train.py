@@ -228,7 +228,7 @@ def train():
                 model_args.model_name_or_path, trust_remote_code=True
             )
             config.attn_config["attn_impl"] = training_args.mpt_attn_impl
-            model_cls = LlavaMPTForCausalLM
+            model_cls = AutoModelForCausalLM
         elif "mistral" in model_args.model_name_or_path.lower():
             config = LlavaMistralConfig.from_pretrained(model_args.model_name_or_path)
             config._attn_implementation = "flash_attention_2"
@@ -256,9 +256,11 @@ def train():
 
     model = model_cls(
         config=config,
-        attn_implementation="flash_attention_2",
+        # attn_implementation="flash_attention_2",
         model_max_length=training_args.model_max_length,
         cache_dir=training_args.cache_dir,
+        # device_map = 'auto',
+        # torch_dtype=torch.float16,
         **bnb_model_from_pretrained_args,
     )
 
